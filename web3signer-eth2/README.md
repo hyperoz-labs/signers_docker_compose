@@ -124,6 +124,55 @@ Notes:
 - The heap-dump path is resolved inside the **target JVM's** filesystem, so the
   `./heapdumps:/heapdumps` mount already declared in `web3signer/compose.yml`
   delivers the file to the host without any extra sidecar mount.
+
+---
+
+## 6. Memory and load harness (Optional)
+
+[`scripts/memleak-test.sh`](scripts/memleak-test.sh) brings the stack up with a given image, generates keys and,
+after every cycle, forces a GC and captures heap usage, a class histogram, `jstat`, container anon RSS, page cache
+and cumulative CPU. It also samples the container's cgroup CPU and memory every 2 seconds into `resources.tsv`.
+It needs `docker`, `curl`, `jq`, `k6` (signing modes) and an image that contains a JDK, because `jcmd`/`jstat` run
+inside the container.
+
+| `MODE` | Each cycle |
+|---|---|
+| `full` | wipe all keys, generate `KEYS` new ones, `/reload` |
+| `partial` | remove `REMOVE_PER_CYCLE` random keys, add `ADD_PER_CYCLE`, `/reload` |
+| `sign` | run the k6 signing load for `SIGN_SECS` with `SIGN_VUS` VUs; keys stay stable |
+| `sign-reload` | one k6 signing load runs for the whole test; every `RELOAD_EVERY_SECS` keys are rotated and reloaded under load |
+
+The k6 script's own variables (`SLOT_SECONDS`, `CLIENTS`, `SLASHABLE_RATIO`, ...) are passed through; see
+[`../web3signer-loadtest/README.md`](../web3signer-loadtest/README.md).
+
+```sh
+# 10K keys, two consensus clients, 3x mainnet signing rate, 5 cycles of one epoch each
+MODE=sign SIGN_SECS=128 SIGN_VUS=8 SLOT_SECONDS=4 CLIENTS=2 \
+  ./scripts/memleak-test.sh web3signer:develop-jdk 5 10000
+
+# the same load while 1000 keys are rotated and reloaded every 2 minutes
+MODE=sign-reload RELOAD_EVERY_SECS=120 REMOVE_PER_CYCLE=1000 ADD_PER_CYCLE=1000 \
+  SIGN_VUS=8 SLOT_SECONDS=4 CLIENTS=2 ./scripts/memleak-test.sh web3signer:develop-jdk 5 10000
+
+# Markdown summary: per-cycle table, heap / RSS slope and CPU; several runs add a comparison table
+./scripts/summarize.py results/<run> [results/<other-run> ...]
+```
+
+Results are written to `results/<image>-<timestamp>/`: `summary.tsv`, `resources.tsv`, `cycle-N.*`, the k6 JSON
+summaries and logs, and `web3signer.log`. A leak shows as a live-heap (class histogram total) or anon RSS slope
+that stays positive across cycles; a healthy run plateaus after the first cycle. In `sign-reload` mode the heap
+metric in `summary.tsv` is read while the load continues, so prefer the class histogram total that
+`summarize.py` reports.
+
+To build a JDK image from a Web3Signer checkout, swap the JRE for the JDK in `docker/Dockerfile`:
+
+```sh
+./gradlew distTar
+sed -E 's/(eclipse-temurin:[^ @]+)-jre@sha256:[0-9a-f]+/\1-jdk/' docker/Dockerfile > /tmp/Dockerfile.jdk
+docker build --build-arg TAR_FILE=./build/distributions/web3signer-develop.tar.gz \
+  -f /tmp/Dockerfile.jdk -t web3signer:develop-jdk .
+```
+
 ## Clean up
 ```shell
 # From another terminal window

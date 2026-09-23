@@ -15,7 +15,7 @@ Four independent scenarios, each with its own README:
 | `web3signer-eth1/` | Web3Signer eth1 mode + LocalStack KMS (uses `compose.yaml`) |
 | `web3signer-eth2/` | Web3Signer eth2 mode + Hashicorp Vault + PostgreSQL/Flyway (multi-stack, see below) |
 | `web3signer-eip-4844/` | Web3Signer eth1 against a Kurtosis-launched Besu+Teku FULU network, driven by Python tests |
-| `web3signer-loadtest/` | k6 load test script targeting a running Web3Signer eth2 signing endpoint |
+| `web3signer-loadtest/` | k6 validator-client duty simulator (attestations, proposals, sync committee, slashing protection probes) for a running Web3Signer eth2 instance |
 
 Each scenario operates **independently** — there is no top-level build or orchestration. Read the scenario's own README before modifying.
 
@@ -123,7 +123,13 @@ python3 test_blob_tx.py
 ```sh
 # Requires a running Web3Signer eth2 instance (see web3signer-eth2 above) with keys loaded.
 k6 run web3signer-loadtest/sign-loadtest.js
-# Defaults: 10 VUs, 30s; hits /api/v1/eth2/sign/{pubkey} with a block payload.
+# Defaults: mainnet slot timing, 4 VUs, 5m. Tune via env (SLOT_SECONDS, CLIENTS, SLASHABLE_RATIO, ...;
+# see web3signer-loadtest/README.md). Slashable probes must be refused with HTTP 412.
+
+# Memory / CPU runs against a JDK image (MODE=full|partial|sign|sign-reload), then summarise:
+MODE=sign SIGN_SECS=128 SIGN_VUS=8 SLOT_SECONDS=4 CLIENTS=2 \
+  ./web3signer-eth2/scripts/memleak-test.sh web3signer:develop-jdk 5 10000
+./web3signer-eth2/scripts/summarize.py web3signer-eth2/results/<run>
 ```
 
 ## Architecture notes that require reading multiple files
