@@ -1,7 +1,7 @@
 services:
     web3signer:
         container_name: "ws-web3signer-eth1"
-        image: "consensys/web3signer:develop"
+        image: "${WEB3SIGNER_IMAGE:-consensys/web3signer:develop}"
         environment:
           - JAVA_OPTS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=0.0.0.0:5005
         command: --config-file=/var/config/config.yaml eth1

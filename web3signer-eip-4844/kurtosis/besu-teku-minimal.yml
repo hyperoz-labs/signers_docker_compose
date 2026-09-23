@@ -6,7 +6,8 @@ participants_matrix:
   cl:
     - cl_type: teku
       cl_image: consensys/teku:develop
-      count: 1
+      # Two nodes so each Teku has a peer: a single Teku stays in syncing state without peers and never proposes.
+      count: 2
 
 network_params:
   min_validator_withdrawability_delay: 1
@@ -15,6 +16,14 @@ network_params:
   fulu_fork_epoch: 10
   genesis_delay: 120
   preset: minimal
+  # ethereum-package defaults bpo_1/bpo_2 (blob-parameter-only forks) to epoch 0 and fails when
+  # any BPO epoch precedes a non-genesis fulu_fork_epoch. Disable all five (FAR_FUTURE_EPOCH) so
+  # the network keeps the Fulu blob parameters.
+  bpo_1_epoch: 18446744073709551615
+  bpo_2_epoch: 18446744073709551615
+  bpo_3_epoch: 18446744073709551615
+  bpo_4_epoch: 18446744073709551615
+  bpo_5_epoch: 18446744073709551615
 
 additional_services:
   - dora

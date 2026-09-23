@@ -19,6 +19,10 @@ kurtosis run --enclave besu-teku github.com/ethpandaops/ethereum-package --args-
 cd web3signer-eth1
 docker compose up
 ```
+To test a locally built image, set `WEB3SIGNER_IMAGE` (defaults to `consensys/web3signer:develop`):
+```sh
+WEB3SIGNER_IMAGE=web3signer:develop docker compose up
+```
 
 ## Run Tests
 Make sure that genesis is completed (can be observed via Dora at http://127.0.0.1:36000)
